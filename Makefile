@@ -2,6 +2,7 @@
 
 
 test: 7cc
+		./7cc -test
 		./test.sh
 
 

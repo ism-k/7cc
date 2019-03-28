@@ -3,8 +3,39 @@
 #include <stdlib.h>
 #include <string.h>
 
-// global value
+// global variable
 int pos = 0;
+
+//////////////////////////////////////////
+// Tokenizer
+//////////////////////////////////////////
+
+// vector
+typedef struct
+{
+    void **data;
+    int capacity; // size of buffer
+    int len;      // number of elements
+} Vector;
+
+Vector *new_vector()
+{
+    Vector *vec = malloc(sizeof(Vector));
+    vec->data = malloc(sizeof(void *) * 16);
+    vec->capacity = 16;
+    vec->len = 0;
+    return vec;
+}
+
+void vec_push(Vector *vec, void *elem)
+{
+    if (vec->capacity == vec->len)
+    {
+        vec->capacity *= 2;
+        vec->data = realloc(vec->data, sizeof(void *) * vec->capacity);
+    }
+    vec->data[vec->len++] = elem;
+}
 
 // Values represent type of token
 enum
@@ -72,7 +103,10 @@ void tokenize(char *p)
     exit(1);
 }*/
 
+//////////////////////////////////////////
 // Abstract Syntax Tree
+//////////////////////////////////////////
+
 enum
 {
     ND_NUM = 256, // Type of Int Node
@@ -177,7 +211,10 @@ Node *add()
     }
 }
 
-// Stuck
+//////////////////////////////////////////
+// Stack Compiler
+//////////////////////////////////////////
+
 void gen(Node *node)
 {
     if (node->ty == ND_NUM)
@@ -214,12 +251,21 @@ void gen(Node *node)
     printf("    push rax\n");
 }
 
+//////////////////////////////////////////
+// Main Function
+//////////////////////////////////////////
+
 int main(int argc, char **argv)
 {
     if (argc != 2)
     {
         fprintf(stderr, "Invalid number of arguments\n");
         return 1;
+    }
+
+    if (strcmp(*argv[1], "-test") == 0)
+    {
+        runtest();
     }
 
     // tokenize and parse
@@ -238,4 +284,32 @@ int main(int argc, char **argv)
     printf("    pop rax\n");
     printf("    ret\n");
     return 0;
+}
+
+//////////////////////////////////////////
+// Test
+//////////////////////////////////////////
+
+int expect(int line, int expected, int actual)
+{
+    if (expected == actual)
+        return;
+    fprintf(stderr, "%d: %d expected, but got %d\n", line, expected, actual);
+    exit(1);
+}
+
+void runtest()
+{
+    Vector *vec = new_vector();
+    expect(__LINE__, 0, vec->len);
+
+    for(int i = 0; i < 100; i++)
+        vec_push(vec, (void *)i);
+    
+    expect(__LINE__, 100, vec->len);
+    expect(__LINE__, 0, (int)vec->data[0]);
+    expect(__LINE__, 50, (int)vec->data[50]);
+    expect(__LINE__, 99, (int)vec->data[99]);
+    
+    printf("OK\n");
 }
