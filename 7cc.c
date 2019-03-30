@@ -52,15 +52,24 @@ typedef struct
     char *input; // String of input (for error message)
 } Token;
 
-Token tokens[100];
+// Token tokens[100];
+
+// Variable-length Vector
+Vector *tokens;
+
+// a token used temporary
+Token *token_tmp;
 
 // Divide p-strings by each tokens
 void tokenize(char *p)
 {
     int i = 0;
+    tokens = new_vector();
 
     while (*p)
     {
+        token_tmp = (Token *)malloc(sizeof(Token *));
+
         // Skip white space
         if (isspace(*p)) 
         {
@@ -71,8 +80,12 @@ void tokenize(char *p)
         // Operator
         if (*p == '+' || *p == '-' || *p == '*' || *p == '/' || *p == '(' || *p == ')') 
         {
-            tokens[i].ty    = *p;
-            tokens[i].input =  p;
+            token_tmp->ty    = *p;
+            token_tmp->input =  p;
+            vec_push(tokens, (void *)token_tmp);
+
+            //printf("operator: %d %s\n", token_tmp->ty, token_tmp->input);
+
             i++;
             p++;
             continue;
@@ -81,9 +94,13 @@ void tokenize(char *p)
         // Integer
         if (isdigit(*p)) 
         {
-            tokens[i].ty    = TK_NUM;
-            tokens[i].input = p;
-            tokens[i].val   = strtol(p, &p, 10);
+            token_tmp->ty    = TK_NUM;
+            token_tmp->input = p;
+            token_tmp->val   = strtol(p, &p, 10);
+            vec_push(tokens, (void *)token_tmp);
+
+            //printf("integer: %d %s %d\n", token_tmp->ty, token_tmp->input, token_tmp->val);
+
             i++;
             continue;
         }
@@ -91,9 +108,13 @@ void tokenize(char *p)
         fprintf(stderr, "Unable to tokenize: %s\n", p);
         exit(1);
     }
+    token_tmp = (Token *)malloc(sizeof(Token *));
 
-    tokens[i].ty    = TK_EOF;
-    tokens[i].input = p;
+    token_tmp->ty    = TK_EOF;
+    token_tmp->input = p;
+    vec_push(tokens, (void *)token_tmp);
+    //printf("EOF: %d %s\n", token_tmp->ty, token_tmp->input);
+    //printf("length: %d\n", tokens->len);
 }
 
 // Report Error
@@ -139,10 +160,16 @@ Node *new_node_num(int val)
     return node;
 }
 
+Token *token_pop;
 // Check whether a next token is an expected type
 int consume(int ty)
 {
-    if (tokens[pos].ty != ty)
+    //printf("compare type: %d\n", ty);
+    token_pop = (Token *)malloc(sizeof(Token *));
+    token_pop = (Token *)tokens->data[pos];
+    //printf("pos %d: (ty, input) = (%d, %s)\n", pos, token_pop->ty, token_pop->input);
+
+    if (token_pop->ty != ty)
         return 0;
     pos++;
     return 1;
@@ -155,22 +182,34 @@ Node *term();
 
 Node *term()
 {
+    //printf("              term()\n");
+
     if (consume('('))
     {
         Node *node = add();
-        if (!consume(')')) 
-            fprintf(stderr, "No mutch parenthesis: %s", tokens[pos].input);
+        if (!consume(')'))
+        {
+            token_pop = (Token *)tokens->data[pos];
+            fprintf(stderr, "No mutch parenthesis: %s", token_pop->input);
+        }
         return node;
     }
 
-    if (tokens[pos].ty == TK_NUM)
-        return new_node_num(tokens[pos++].val);
+    //printf("pos: %d\n", pos);
+    token_pop = (Token *)tokens->data[pos];
+    //printf("type: %d\n", token_pop->ty);
+    if (token_pop->ty == TK_NUM)
+    {
+        pos++;
+        return new_node_num(token_pop->val);
+    }
     
-    fprintf(stderr, "This token is neither Number nor Parenthesis: %s", tokens[pos].input);
+    fprintf(stderr, "This token is neither Number nor Parenthesis: %s", token_pop->input);
 }
 
 Node *mul()
 {
+    //printf("              mul()\n");
     Node *node = term();
 
     for( ; ; )
@@ -192,6 +231,7 @@ Node *mul()
 
 Node *add()
 {
+    //printf("              add()\n");
     Node *node = mul();
 
     for( ; ; )
@@ -252,41 +292,6 @@ void gen(Node *node)
 }
 
 //////////////////////////////////////////
-// Main Function
-//////////////////////////////////////////
-
-int main(int argc, char **argv)
-{
-    if (argc != 2)
-    {
-        fprintf(stderr, "Invalid number of arguments\n");
-        return 1;
-    }
-
-    if (strcmp(*argv[1], "-test") == 0)
-    {
-        runtest();
-    }
-
-    // tokenize and parse
-    tokenize(argv[1]);
-    Node *node = add();
-
-    // header
-    printf(".intel_syntax noprefix\n");
-    printf(".global main\n");
-    printf("main:\n");
-
-    // Code generation
-    gen(node);
-
-    // Pop answer from stuck-top
-    printf("    pop rax\n");
-    printf("    ret\n");
-    return 0;
-}
-
-//////////////////////////////////////////
 // Test
 //////////////////////////////////////////
 
@@ -300,6 +305,8 @@ int expect(int line, int expected, int actual)
 
 void runtest()
 {
+    //printf("Test: Create Vector-unit\n");
+
     Vector *vec = new_vector();
     expect(__LINE__, 0, vec->len);
 
@@ -310,6 +317,72 @@ void runtest()
     expect(__LINE__, 0, (int)vec->data[0]);
     expect(__LINE__, 50, (int)vec->data[50]);
     expect(__LINE__, 99, (int)vec->data[99]);
-    
-    printf("OK\n");
+
+    //printf("Done\n");
+
+    //printf("Test: Re-cast token\n");
+    Vector *vec_token = new_vector();
+    //printf("Vector vec_token created\n");
+
+    char *p = "0";
+    //printf("char p created\n");
+    Token *t;
+    t = (Token *)malloc(sizeof(Token *));
+    t->ty    = TK_NUM; //printf("State: t->ty = p; done\n");
+    t->input = p; //printf("State: t->input = p; done\n");
+    t->val   = strtol(p, &p, 10); //printf("State: t->val = strtol(p, &p, 10); done\n");
+
+    vec_push(vec_token, (void *)t);
+    //printf("push token done\n");
+
+    Token *t_pop;
+    t_pop = (Token *)vec_token->data[0];
+    //printf("t_pop->input: %s\n", t_pop->input);
+    //printf("t_pop->ty: %d\n", t_pop->ty);
+    //printf("t_pop->val: %d\n", t_pop->val);
+
+    //printf("Done\n");
+
+    //printf("OK\n");
+}
+
+//////////////////////////////////////////
+// Main Function
+//////////////////////////////////////////
+
+int main(int argc, char **argv)
+{
+    if (argc != 2)
+    {
+        fprintf(stderr, "Invalid number of arguments\n");
+        return 1;
+    }
+
+    if (!strcmp(argv[1], "-test"))
+    {
+        printf("run test\n");
+        runtest();
+        return 0;
+    }
+
+    // tokenize and parse
+    //printf("Start: Tokenizer\n");
+    tokenize(argv[1]);
+    //printf("Done: Tokenizer\n");
+    //printf("Start: Parser\n");
+    Node *node = add();
+    //printf("Done: Parser\n");
+
+    // header
+    printf(".intel_syntax noprefix\n");
+    printf(".global main\n");
+    printf("main:\n");
+
+    // Code generation
+    gen(node);
+
+    // Pop answer from stuck-top
+    printf("    pop rax\n");
+    printf("    ret\n");
+    return 0;
 }
