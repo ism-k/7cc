@@ -3,3 +3,4 @@
 *.o
 tmp*
 7cc
+*.ipch
