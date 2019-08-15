@@ -1,6 +1,8 @@
-.vscode/
+/vscode/
 *~
 *.o
 tmp*
 7cc
 *.ipch
+/target/
+Cargo.lock
